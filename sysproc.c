@@ -93,8 +93,18 @@ sys_uptime(void)
 int
 sys_memsize(void)
 {
-	uint size;
-	struct proc *proc = myproc();
-	size = proc->sz;
-	return size;
+  uint size;
+  struct proc *proc = myproc();
+  size = proc->sz;
+  return size;
+}
+
+int
+sys_trace(void)
+{
+  int n;
+  if(argint(0, &n) < 0)
+    return -1;
+  myproc()->tracemask = n;
+  return n;
 }
