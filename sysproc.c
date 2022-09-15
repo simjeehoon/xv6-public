@@ -89,3 +89,12 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+int
+sys_memsize(void)
+{
+	uint size;
+	struct proc *proc = myproc();
+	size = proc->sz;
+	return size;
+}
