@@ -10,11 +10,13 @@
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
+  int minpriority;			// min priority for new process
 } ptable;
 
 static struct proc *initproc;
 
 int nextpid = 1;
+int nextweight = 1;
 extern void forkret(void);
 extern void trapret(void);
 
@@ -88,6 +90,8 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
+  p->weight = nextweight++;
+  p->priority = ptable.minpriority;
 
   release(&ptable.lock);
 
@@ -326,25 +330,45 @@ scheduler(void)
   struct proc *p;
   struct cpu *c = mycpu();
   c->proc = 0;
+
+  struct proc *selected;
+  int minpriority;
   
   for(;;){
+	minpriority = -1;
+	selected = (void*)0;
     // Enable interrupts on this processor.
     sti();
 
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE)
+	  // Calculate new priority for all proc
+#define TIME_SLICE 10000000
+	  p->priority = p->priority + (TIME_SLICE / p->weight);
+	  // assign min priority in ptable
+	  if(p == ptable.proc || ptable.minpriority > p->priority){
+		ptable.minpriority = p->priority;
+	  }
+	  
+      if(p->state != RUNNABLE) // only select RUNNABLE process
         continue;
-
+	  // select process which has min priority
+	  else if(minpriority == -1 || minpriority > p->priority){
+		minpriority = p->priority;
+		selected = p;
+	  }
+	}
+	
+	if(selected){
       // Switch to chosen process.  It is the process's job
       // to release ptable.lock and then reacquire it
       // before jumping back to us.
-      c->proc = p;
-      switchuvm(p);
-      p->state = RUNNING;
+      c->proc = selected;
+      switchuvm(selected);
+      selected->state = RUNNING;
 
-      swtch(&(c->scheduler), p->context);
+      swtch(&(c->scheduler), selected->context);
       switchkvm();
 
       // Process is done running for now.
@@ -461,8 +485,10 @@ wakeup1(void *chan)
   struct proc *p;
 
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
-    if(p->state == SLEEPING && p->chan == chan)
+    if(p->state == SLEEPING && p->chan == chan){
+	  p->priority = ptable.minpriority;	//set priority to min process priority
       p->state = RUNNABLE;
+	}
 }
 
 // Wake up all processes sleeping on chan.

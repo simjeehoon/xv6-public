@@ -51,6 +51,8 @@ struct proc {
   char name[16];               // Process name (debugging)
 
   uint tracemask;			   // mask for trace
+  int priority;				   // priority variable for scheduling
+  int weight;				   // weight variable for scheduling
 };
 
 // Process memory is laid out contiguously, low addresses first:
