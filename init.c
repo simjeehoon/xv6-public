@@ -5,7 +5,7 @@
 #include "user.h"
 #include "fcntl.h"
 
-char *argv[] = { "ssu_login", 0 };
+char *argv[] = { "sh", 0 };
 
 int
 main(void)
@@ -27,9 +27,8 @@ main(void)
       exit();
     }
     if(pid == 0){
-	  exec("ssu_login", argv);
-      //exec("sh", argv);
-      printf(1, "init: exec login failed\n");
+      exec("sh", argv);
+      printf(1, "init: exec sh failed\n");
       exit();
     }
     while((wpid=wait()) >= 0 && wpid != pid)

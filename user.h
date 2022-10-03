@@ -25,6 +25,7 @@ int sleep(int);
 int uptime(void);
 int memsize(void);
 int trace(int mask);
+int weightset(int weight);
 
 // ulib.c
 int stat(const char*, struct stat*);

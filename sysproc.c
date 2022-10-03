@@ -108,3 +108,16 @@ sys_trace(void)
   myproc()->tracemask = n;
   return n;
 }
+
+int
+sys_weightset(void)
+{
+  int weight;
+  if(argint(0, &weight) < 0)
+    return -1;
+  if(weight <= 0)
+	return -1; 
+  extern int nextweight;
+  nextweight = weight;
+  return weight;
+}

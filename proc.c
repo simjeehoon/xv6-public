@@ -10,7 +10,7 @@
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
-  int minpriority;			// min priority for new process
+  long minpriority;			// min priority for new process
 } ptable;
 
 static struct proc *initproc;
@@ -333,34 +333,43 @@ scheduler(void)
 
   struct proc *selected;
   int minpriority;
+  int updated;
   
   for(;;){
-	minpriority = -1;
 	selected = (void*)0;
+	updated = 0; 
+
     // Enable interrupts on this processor.
     sti();
-
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-	  // Calculate new priority for all proc
-#define TIME_SLICE 10000000
-	  p->priority = p->priority + (TIME_SLICE / p->weight);
-	  // assign min priority in ptable
-	  if(p == ptable.proc || ptable.minpriority > p->priority){
-		ptable.minpriority = p->priority;
-	  }
-	  
-      if(p->state != RUNNABLE) // only select RUNNABLE process
-        continue;
-	  // select process which has min priority
-	  else if(minpriority == -1 || minpriority > p->priority){
-		minpriority = p->priority;
-		selected = p;
+      if(p->state == RUNNABLE){ // only select RUNNABLE process
+		// select process which has min priority
+		if(selected == (void*)0 || minpriority > p->priority){
+		  minpriority = p->priority;
+		  selected = p;
+		}
 	  }
 	}
-	
-	if(selected){
+	if(selected != (void*)0){
+	  //calculate new priority
+#define TIME_SLICE 10000000L
+	  selected->priority = selected->priority + (TIME_SLICE / selected->weight);
+
+	  //renew min priority
+	  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+		if(p->state == RUNNABLE){ 
+		  if(!updated || minpriority > p->priority){
+			updated = 1;
+			minpriority = p->priority;
+		  }
+		}
+	  }
+	  if(updated){
+		ptable.minpriority = minpriority;
+	  }
+
       // Switch to chosen process.  It is the process's job
       // to release ptable.lock and then reacquire it
       // before jumping back to us.
@@ -376,9 +385,46 @@ scheduler(void)
       c->proc = 0;
     }
     release(&ptable.lock);
+  }
+}
+
+/*
+void
+scheduler(void)
+{
+  struct proc *p;
+  struct cpu *c = mycpu();
+  c->proc = 0;
+  
+  for(;;){
+    // Enable interrupts on this processor.
+    sti();
+
+    // Loop over process table looking for process to run.
+    acquire(&ptable.lock);
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->state != RUNNABLE)
+        continue;
+
+      // Switch to chosen process.  It is the process's job
+      // to release ptable.lock and then reacquire it
+      // before jumping back to us.
+      c->proc = p;
+      switchuvm(p);
+      p->state = RUNNING;
+
+      swtch(&(c->scheduler), p->context);
+      switchkvm();
+
+      // Process is done running for now.
+      // It should have changed its p->state before coming back.
+      c->proc = 0;
+    }
+    release(&ptable.lock);
 
   }
 }
+*/
 
 // Enter scheduler.  Must hold only ptable.lock
 // and have changed proc->state. Saves and restores
