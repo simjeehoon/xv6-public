@@ -90,8 +90,8 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
-  p->weight = nextweight++;
-  p->priority = ptable.minpriority;
+  p->weight = nextweight++; //set weight
+  p->priority = ptable.minpriority; // set min priority
 
   release(&ptable.lock);
 
@@ -127,6 +127,10 @@ userinit(void)
   struct proc *p;
   extern char _binary_initcode_start[], _binary_initcode_size[];
 
+  acquire(&ptable.lock); 
+  ptable.minpriority = 3; //set minpriority
+  release(&ptable.lock);
+
   p = allocproc();
   
   initproc = p;
@@ -151,7 +155,6 @@ userinit(void)
   // writes to be visible, and the lock is also needed
   // because the assignment might not be atomic.
   acquire(&ptable.lock);
-
   p->state = RUNNABLE;
 
   release(&ptable.lock);
@@ -352,7 +355,26 @@ scheduler(void)
 		}
 	  }
 	}
-	if(selected != (void*)0){
+	if(selected != (void*)0){ //selected.
+#ifdef DEBUG
+		cprintf("PID: %d, NAME: %s, WEIGHT: %d, PRIORITY: %d\n",
+				selected->pid, selected->name, selected->weight, selected->priority);
+#endif
+
+      // Switch to chosen process.  It is the process's job
+      // to release ptable.lock and then reacquire it
+      // before jumping back to us.
+      c->proc = selected;
+      switchuvm(selected);
+      selected->state = RUNNING;
+
+      swtch(&(c->scheduler), selected->context);
+      switchkvm();
+
+      // Process is done running for now.
+      // It should have changed its p->state before coming back.
+
+
 	  //calculate new priority
 #define TIME_SLICE 10000000L
 	  selected->priority = selected->priority + (TIME_SLICE / selected->weight);
@@ -370,61 +392,12 @@ scheduler(void)
 		ptable.minpriority = minpriority;
 	  }
 
-      // Switch to chosen process.  It is the process's job
-      // to release ptable.lock and then reacquire it
-      // before jumping back to us.
-      c->proc = selected;
-      switchuvm(selected);
-      selected->state = RUNNING;
-
-      swtch(&(c->scheduler), selected->context);
-      switchkvm();
-
-      // Process is done running for now.
-      // It should have changed its p->state before coming back.
       c->proc = 0;
     }
     release(&ptable.lock);
   }
 }
 
-/*
-void
-scheduler(void)
-{
-  struct proc *p;
-  struct cpu *c = mycpu();
-  c->proc = 0;
-  
-  for(;;){
-    // Enable interrupts on this processor.
-    sti();
-
-    // Loop over process table looking for process to run.
-    acquire(&ptable.lock);
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE)
-        continue;
-
-      // Switch to chosen process.  It is the process's job
-      // to release ptable.lock and then reacquire it
-      // before jumping back to us.
-      c->proc = p;
-      switchuvm(p);
-      p->state = RUNNING;
-
-      swtch(&(c->scheduler), p->context);
-      switchkvm();
-
-      // Process is done running for now.
-      // It should have changed its p->state before coming back.
-      c->proc = 0;
-    }
-    release(&ptable.lock);
-
-  }
-}
-*/
 
 // Enter scheduler.  Must hold only ptable.lock
 // and have changed proc->state. Saves and restores
