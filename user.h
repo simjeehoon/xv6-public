@@ -23,9 +23,7 @@ int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
-int memsize(void);
-int trace(int mask);
-int weightset(int weight);
+int weightset(int weight); // [OS] weight set sys call
 
 // ulib.c
 int stat(const char*, struct stat*);
