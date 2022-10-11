@@ -10,7 +10,7 @@
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
-  long minpriority;			// min priority for new process
+  long minpriority;			// [OS] min priority for new process
 } ptable;
 
 static struct proc *initproc;
@@ -90,8 +90,8 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
-  p->weight = nextweight++; //set weight
-  p->priority = ptable.minpriority; // set min priority
+  p->weight = nextweight++; // [OS] Set weight
+  p->priority = ptable.minpriority; // [OS Set min priority
 
   release(&ptable.lock);
 
@@ -128,7 +128,7 @@ userinit(void)
   extern char _binary_initcode_start[], _binary_initcode_size[];
 
   acquire(&ptable.lock); 
-  ptable.minpriority = 3; //set minpriority
+  ptable.minpriority = 3; // [OS] Set minpriority
   release(&ptable.lock);
 
   p = allocproc();
@@ -206,7 +206,7 @@ fork(void)
   np->sz = curproc->sz;
   np->parent = curproc;
   *np->tf = *curproc->tf;
-  np->tracemask = curproc->tracemask;
+  np->tracemask = curproc->tracemask; // [OS] Trace mask
 
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
@@ -505,7 +505,7 @@ wakeup1(void *chan)
 
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
     if(p->state == SLEEPING && p->chan == chan){
-	  p->priority = ptable.minpriority;	//set priority to min process priority
+	  p->priority = ptable.minpriority;	// [OS] Set priority to min priority
       p->state = RUNNABLE;
 	}
 }

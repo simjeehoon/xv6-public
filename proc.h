@@ -50,9 +50,9 @@ struct proc {
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
 
-  uint tracemask;			   // mask for trace
-  long priority;				   // priority variable for scheduling
-  long weight;				   // weight variable for scheduling
+  uint tracemask;			   // [OS] mask for trace
+  long priority;			   // [OS] priority variable for scheduling
+  long weight;				   // [OS] weight variable for scheduling
 };
 
 // Process memory is laid out contiguously, low addresses first:

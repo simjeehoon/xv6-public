@@ -117,7 +117,7 @@ sys_weightset(void)
     return -1;
   if(weight <= 0)
 	return -1; 
-  extern int nextweight;
+  extern int nextweight; // [OS] extern variable to set weight
   nextweight = weight;
   return weight;
 }

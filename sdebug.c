@@ -15,26 +15,35 @@ void sdebug_func(void)
 
   printf(1, "start sdebug command\n");
   for(i = 1 ; i <= PNUM ; i++){
-	weightset(i);
+	weightset(i); // Set weight to i
 	pid = fork();
-	start = uptime();
-	if(pid == 0){ // child process
+	start = uptime(); // Check start time
+	if(pid == 0){ // Child process
+	  /*
+		 Count PRINT_CYCLE
+		 and print this process information.
+	  */
 	  while(counter < PRINT_CYCLE)
 		++counter;
 	  printf(1, "PID: %d, WEIGHT: %d, TIMES: %d ms\n", getpid(), i, (uptime()-start)*10);
+
+	  /*
+		 Count TOTAL_COUNTER
+		 and exit this process.
+	  */
 	  while(counter < TOTAL_COUNTER)
 		++counter;
 	  printf(1, "PID: %d terminated\n", getpid());
 	  exit();
 	}
-	else if(pid > 0) // parent process
-	  continue;
-	else{ // error
+	else if(pid > 0) // Parent process
+	  continue; // Loop for making child process.
+	else{ // Error
 	  printf(1, "ERROR: fork\n");
 	  break;
 	}
   }
-  for(i = 1 ; i <= PNUM ; i++)
+  for(i = 1 ; i <= PNUM ; i++) // Wait childs.
 	wait();
 
   printf(1, "end of sdebug command\n");
