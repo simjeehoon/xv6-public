@@ -90,6 +90,11 @@ sys_uptime(void)
   return xticks;
 }
 
+/**
+  [OS] It is used for sdebug.
+  Set extern variable weight to user's argument.
+  Then new process will get this new weight.
+   */
 int
 sys_weightset(void)
 {
