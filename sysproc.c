@@ -91,7 +91,7 @@ sys_uptime(void)
 }
 
 /**
-  [OS] It is used for sdebug.
+  [20172644] It is used for sdebug.
   Set extern variable weight to user's argument.
   Then new process will get this new weight.
    */
@@ -103,7 +103,7 @@ sys_weightset(void)
     return -1;
   if(weight <= 0)
 	return -1; 
-  extern int nextweight; // [OS] extern variable to set weight
+  extern int nextweight; // [20172644] extern variable to set weight
   nextweight = weight;
   return weight;
 }
