@@ -22,6 +22,8 @@ void            cprintf(char*, ...);
 void            consoleintr(int(*)(void));
 void            panic(char*) __attribute__((noreturn));
 
+void			printul(unsigned long); // [20172644] for debug option
+
 // exec.c
 int             exec(char*, char**);
 

@@ -24,6 +24,23 @@ static struct {
   int locking;
 } cons;
 
+/*
+   [20172644] function to print unsigned long integer in cernel
+   */
+void
+printul(unsigned long x)
+{
+  static char digits[] = "0123456789abcdef";
+  char buf[48];
+  int i = 0;
+  do{
+    buf[i++] = digits[x % 10];
+  }while((x /= 10) != 0);
+
+  while(--i >= 0)
+    consputc(buf[i]);
+}
+
 static void
 printint(int xx, int base, int sign)
 {

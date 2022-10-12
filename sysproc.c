@@ -103,7 +103,7 @@ sys_weightset(void)
     return -1;
   if(weight <= 0)
 	return -1; 
-  extern int nextweight; // [20172644] extern variable to set weight
+  extern unsigned long nextweight; // [20172644] extern variable to set weight
   nextweight = weight;
   return weight;
 }

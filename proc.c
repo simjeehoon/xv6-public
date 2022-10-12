@@ -10,13 +10,13 @@
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
-  long minpriority;			// [20172644] min priority for new process
+  unsigned long minpriority;			// [20172644] min priority for new process
 } ptable;
 
 static struct proc *initproc;
 
 int nextpid = 1;
-int nextweight = 1;  // [20172644] weight value for new process
+unsigned long nextweight = 1;  // [20172644] weight value for new process
 extern void forkret(void);
 extern void trapret(void);
 
@@ -335,7 +335,7 @@ scheduler(void)
   c->proc = 0;
 
   struct proc *selected; // [20172644] proc variable for SSU Scheduler
-  int minpriority;  // [20172644] min priority variable for SSU Scheduler
+  unsigned long minpriority;  // [20172644] min priority variable for SSU Scheduler
   int updated; // [20172644] If ptable.minpriority is updated, this will be set 1.
   
   for(;;){
@@ -363,8 +363,10 @@ scheduler(void)
 		  [20172644] If it's debug mode, print process id, name, weight, priority.
 		  */
 #ifdef DEBUG
-		cprintf("PID: %d, NAME: %s, WEIGHT: %d, PRIORITY: %d\n",
-				selected->pid, selected->name, selected->weight, selected->priority);
+		cprintf("PID: %d, NAME: %s, WEIGHT: %d, PRIORITY: ",
+				selected->pid, selected->name, selected->weight);
+		printul(selected->priority);
+		cprintf("\n");
 #endif
 
       // Switch to chosen process.  It is the process's job
