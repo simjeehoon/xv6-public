@@ -15,7 +15,10 @@ void sdebug_func(void)
 
   printf(1, "start sdebug command\n");
   for(i = 1 ; i <= PNUM ; i++){
-	weightset(i); // [20172644] Set weight to i
+	if(weightset(i) < 0){
+	  printf(1, "weightset error\n");	
+	  exit();
+	} // [20172644] Set weight to i
 	pid = fork();
 	start = uptime(); // [20172644] Check start time
 	if(pid == 0){ // [20172644] Child process
