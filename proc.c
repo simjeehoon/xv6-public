@@ -587,3 +587,15 @@ procdump(void)
     cprintf("\n");
   }
 }
+
+/**
+ [20172644]
+  This is called by system call weightset.
+  Set weight in caller's proc struct to w
+  */
+void do_weightset(unsigned long w){
+  acquire(&ptable.lock);
+  struct proc *p = myproc(); 
+  p->weight = w;
+  release(&ptable.lock);
+}

@@ -122,6 +122,7 @@ void            userinit(void);
 int             wait(void);
 void            wakeup(void*);
 void            yield(void);
+void			do_weightset(unsigned long w);
 
 // swtch.S
 void            swtch(struct context**, struct context*);
