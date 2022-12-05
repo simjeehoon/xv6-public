@@ -77,6 +77,53 @@ balloc(uint dev)
   panic("balloc: out of blocks");
 }
 
+// [20172644] Allocate zeroed disk blocks.
+static uint
+bcsalloc(uint dev, uint length)
+{
+  int b, bi, m;
+  struct buf *bp;
+  int b_start = -1;
+  int b_length = 0;
+
+  bp = 0;
+  for(b = 0; b < sb.size; b += BPB){
+    for(bi = 0; bi < BPB && b + bi < sb.size; bi++){
+	  bp = bread(dev, BBLOCK(b, sb)); // 블록을 읽는다.
+      m = 1 << (bi % 8);
+	  if(b_start == -1) { // 시작 블록을 못찾았다
+		if((bp->data[bi/8] & m) == 0){  // 블록이 비어있나
+		  bp->data[bi/8] |= m;  // Mark block in use.
+		  log_write(bp);
+		  brelse(bp);
+		  bzero(dev, b + bi);
+		  b_start = b + bi;
+		  b_length = 1;
+		  if(b_length >= length) // 길이가 1이면 그대로 반환
+			return (b_start << 8) | (b_length & 255);
+		}
+	  }
+	  else { // 시작 블록부터 연속된 블록을 찾고 있다.
+		if((bp->data[bi/8] & m) == 0){  // 연속된 블럭이 비어있나
+		  bp->data[bi/8] |= m;  // Mark block in use.
+		  log_write(bp);
+		  brelse(bp);
+		  bzero(dev, b + bi);
+		  b_length++;
+		  if(b_length >= length || b_length >= 255) // 길이만큼 할당받았거나 최대 길이만큼 받았다면
+			return (b_start << 8) | (b_length & 255);
+		}
+		else{ // 그다음 블럭에 다른 데이터가 있다면
+		  brelse(bp);
+		  return (b_start << 8) | (b_length & 255);
+		}
+	  }
+    }
+    brelse(bp);
+  }
+  panic("balloc: out of blocks");
+}
+
 // Free a disk block.
 static void
 bfree(int dev, uint b)
@@ -399,6 +446,28 @@ bmap(struct inode *ip, uint bn)
   panic("bmap: out of range");
 }
 
+//[20172644] bcsmap
+static uint
+bcsmap(struct inode *ip, uint bn, uint size)
+{
+  uint addr;
+  uint blen;
+  if(length%BSIZE == 0){
+	blen = size/BSIZE;
+  }
+  else{
+	blen = size/BSIZE + 1;
+  }
+
+  if(bn < NDIRECT){
+    if((addr = ip->addrs[bn]) == 0)
+      ip->addrs[bn] = addr = bcsalloc(ip->dev, blen);
+    return addr;
+  }
+
+  panic("bmap: out of range");
+}
+
 // Truncate inode (discard contents).
 // Only called when the inode has no links
 // to it (no directory entries referring to it)
@@ -501,6 +570,58 @@ writei(struct inode *ip, char *src, uint off, uint n)
     memmove(bp->data + off%BSIZE, src, m);
     log_write(bp);
     brelse(bp);
+  }
+
+  if(n > 0 && off > ip->size){
+    ip->size = off;
+    iupdate(ip);
+  }
+  return n;
+}
+
+// Caller must hold ip->lock.
+// [20172644] write cs
+int
+writeics(struct inode *ip, char *src, uint off, uint n)
+{
+  uint tot, m;
+  struct buf *bp;
+
+  if(ip->type == T_DEV){
+    if(ip->major < 0 || ip->major >= NDEV || !devsw[ip->major].write)
+      return -1;
+    return devsw[ip->major].write(ip, src, n);
+  }
+
+  if(off > ip->size || off + n < off)
+    return -1;
+  if(off + n > MAXFILE*BSIZE)
+    return -1;
+
+  uint cs_addr, addr, length;
+  uint bn=0;
+  uint accum = 0;
+  while(ip->addrs[bn]){
+	accum += ip->addrs[bn] & 255;
+	if(accum >= off/BSIZE){
+	  accum -= ip->addrs[bn] & 255;
+	  break;
+	}
+	if(++bn >= NDIRECT)
+	  return -1;
+  }
+  
+  for(tot=0; tot<n; tot+=m, off+=m, src+=m){
+	cs_addr = bcsmap(ip, bn, n - tot);
+	addr = cs_addr >> 8;
+	length = cs_addr & 255;
+	
+    bp = bread(ip->dev, addr);
+    m = min(n - tot, (accum + length) * BSIZE - off);
+    memmove(bp->data + (off - accum*BSIZE), src, m);
+    log_write(bp);
+    brelse(bp);
+	accum += length;
   }
 
   if(n > 0 && off > ip->size){
