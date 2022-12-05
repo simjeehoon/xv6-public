@@ -298,45 +298,26 @@ sys_open(void)
 
   begin_op();
 
-  // [20172644] CS 처리
-  if(omode & O_CS){
-	if(omode & O_CREATE){
+  if(omode & O_CREATE){
+    // [20172644] CS 처리
+	if(omode & O_CS)
 	  ip = create(path, T_CS, 0, 0);
-	  if(ip == 0){
-		end_op();
-		return -1;
-	  }
-	} else {
-	  if((ip = namei(path)) == 0){
-		end_op();
-		return -1;
-	  }
-	  ilock(ip);
-	  if(ip->type == T_DIR && omode != O_RDONLY){
-		iunlockput(ip);
-		end_op();
-		return -1;
-	  }
-	}
-  }
-  else{ // [20172644] CS가 아닐때
-	if(omode & O_CREATE){
+	else
 	  ip = create(path, T_FILE, 0, 0);
-	  if(ip == 0){
-		end_op();
-		return -1;
-	  }
-	} else {
-	  if((ip = namei(path)) == 0){
-		end_op();
-		return -1;
-	  }
-	  ilock(ip);
-	  if(ip->type == T_DIR && omode != O_RDONLY){
-		iunlockput(ip);
-		end_op();
-		return -1;
-	  }
+	if(ip == 0){
+	  end_op();
+	  return -1;
+	}
+  } else {
+	if((ip = namei(path)) == 0){
+	  end_op();
+	  return -1;
+	}
+	ilock(ip);
+	if(ip->type == T_DIR && omode != O_RDONLY){
+	  iunlockput(ip);
+	  end_op();
+	  return -1;
 	}
   }
 
@@ -355,8 +336,6 @@ sys_open(void)
   f->off = 0;
   f->readable = !(omode & O_WRONLY);
   f->writable = (omode & O_WRONLY) || (omode & O_RDWR);
-  // [20172644] CS 모드 처리
-  f->csmode = (omode & O_CS) ? 1 : 0;
   return fd;
 }
 

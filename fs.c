@@ -446,7 +446,7 @@ bmap(struct inode *ip, uint bn)
   panic("bmap: out of range");
 }
 
-//[20172644] bcsmap
+// [20172644] bcsmap
 static uint
 bcsmap(struct inode *ip, uint bn, uint size)
 {
@@ -465,7 +465,7 @@ bcsmap(struct inode *ip, uint bn, uint size)
     return addr;
   }
 
-  panic("bmap: out of range");
+  panic("bcsmap: out of range");
 }
 
 // Truncate inode (discard contents).
@@ -478,29 +478,44 @@ itrunc(struct inode *ip)
 {
   int i, j;
   struct buf *bp;
+  uint addr, length;
   uint *a;
-
-  for(i = 0; i < NDIRECT; i++){
-    if(ip->addrs[i]){
-      bfree(ip->dev, ip->addrs[i]);
-      ip->addrs[i] = 0;
-    }
+  if(ip->type == T_CS){
+	for(i = 0; i < NDIRECT; i++){
+	  if(ip->addrs[i]){
+		addr = ip->addrs[i] >> 8;
+		length = ip->addrs[i] & 255;
+		for(j = 0 ; j < length ; j++)
+		  bfree(ip->dev, addr+BSIZE*j);
+		ip->addrs[i] = 0;
+	  }
+	}
+	ip->size = 0;
+	iupdate(ip);
   }
+  else{
+	for(i = 0; i < NDIRECT; i++){
+	  if(ip->addrs[i]){
+		bfree(ip->dev, ip->addrs[i]);
+		ip->addrs[i] = 0;
+	  }
+	}
 
-  if(ip->addrs[NDIRECT]){
-    bp = bread(ip->dev, ip->addrs[NDIRECT]);
-    a = (uint*)bp->data;
-    for(j = 0; j < NINDIRECT; j++){
-      if(a[j])
-        bfree(ip->dev, a[j]);
-    }
-    brelse(bp);
-    bfree(ip->dev, ip->addrs[NDIRECT]);
-    ip->addrs[NDIRECT] = 0;
+	if(ip->addrs[NDIRECT]){
+	  bp = bread(ip->dev, ip->addrs[NDIRECT]);
+	  a = (uint*)bp->data;
+	  for(j = 0; j < NINDIRECT; j++){
+		if(a[j])
+		  bfree(ip->dev, a[j]);
+	  }
+	  brelse(bp);
+	  bfree(ip->dev, ip->addrs[NDIRECT]);
+	  ip->addrs[NDIRECT] = 0;
+	}
+
+	ip->size = 0;
+	iupdate(ip);
   }
-
-  ip->size = 0;
-  iupdate(ip);
 }
 
 // Copy stat information from inode.
@@ -524,6 +539,10 @@ readi(struct inode *ip, char *dst, uint off, uint n)
   uint tot, m;
   struct buf *bp;
 
+  uint cs_addr, addr, length;
+  uint bn=0;
+  uint accum = 0;
+
   if(ip->type == T_DEV){
     if(ip->major < 0 || ip->major >= NDEV || !devsw[ip->major].read)
       return -1;
@@ -535,14 +554,41 @@ readi(struct inode *ip, char *dst, uint off, uint n)
   if(off + n > ip->size)
     n = ip->size - off;
 
-  for(tot=0; tot<n; tot+=m, off+=m, dst+=m){
-    bp = bread(ip->dev, bmap(ip, off/BSIZE));
-    m = min(n - tot, BSIZE - off%BSIZE);
-    memmove(dst, bp->data + off%BSIZE, m);
-    brelse(bp);
+  // [20172644] readics
+  if(ip->type == T_CS){
+	while(ip->addrs[bn]){
+	  accum += ip->addrs[bn] & 255;
+	  if(accum >= off/BSIZE){
+		accum -= ip->addrs[bn] & 255;
+		break;
+	  }
+	  if(++bn >= NDIRECT)
+		return -1;
+	}
+
+	for(tot=0; tot<n; tot+=m, off+=m, dst+=m){
+	  cs_addr = bcsmap(ip, bn, n - tot);
+	  addr = cs_addr >> 8;
+	  length = cs_addr & 255;
+	  
+	  bp = bread(ip->dev, addr);
+	  m = min(n - tot, (accum + length) * BSIZE - off);
+	  memmove(dst, bp->data + (off - accum*BSIZE), m);
+	  brelse(bp);
+	  accum += length;
+	}
+  }
+  else{
+	for(tot=0; tot<n; tot+=m, off+=m, dst+=m){
+	  bp = bread(ip->dev, bmap(ip, off/BSIZE));
+	  m = min(n - tot, BSIZE - off%BSIZE);
+	  memmove(dst, bp->data + off%BSIZE, m);
+	  brelse(bp);
+	}
   }
   return n;
 }
+
 
 // PAGEBREAK!
 // Write data to inode.
@@ -553,80 +599,60 @@ writei(struct inode *ip, char *src, uint off, uint n)
   uint tot, m;
   struct buf *bp;
 
-  if(ip->type == T_DEV){
-    if(ip->major < 0 || ip->major >= NDEV || !devsw[ip->major].write)
-      return -1;
-    return devsw[ip->major].write(ip, src, n);
-  }
-
-  if(off > ip->size || off + n < off)
-    return -1;
-  if(off + n > MAXFILE*BSIZE)
-    return -1;
-
-  for(tot=0; tot<n; tot+=m, off+=m, src+=m){
-    bp = bread(ip->dev, bmap(ip, off/BSIZE));
-    m = min(n - tot, BSIZE - off%BSIZE);
-    memmove(bp->data + off%BSIZE, src, m);
-    log_write(bp);
-    brelse(bp);
-  }
-
-  if(n > 0 && off > ip->size){
-    ip->size = off;
-    iupdate(ip);
-  }
-  return n;
-}
-
-// Caller must hold ip->lock.
-// [20172644] write cs
-int
-writeics(struct inode *ip, char *src, uint off, uint n)
-{
-  uint tot, m;
-  struct buf *bp;
-
-  if(ip->type == T_DEV){
-    if(ip->major < 0 || ip->major >= NDEV || !devsw[ip->major].write)
-      return -1;
-    return devsw[ip->major].write(ip, src, n);
-  }
-
-  if(off > ip->size || off + n < off)
-    return -1;
-  if(off + n > MAXFILE*BSIZE)
-    return -1;
-
   uint cs_addr, addr, length;
   uint bn=0;
   uint accum = 0;
-  while(ip->addrs[bn]){
-	accum += ip->addrs[bn] & 255;
-	if(accum >= off/BSIZE){
-	  accum -= ip->addrs[bn] & 255;
-	  break;
-	}
-	if(++bn >= NDIRECT)
-	  return -1;
+
+  if(ip->type == T_DEV){
+    if(ip->major < 0 || ip->major >= NDEV || !devsw[ip->major].write)
+      return -1;
+    return devsw[ip->major].write(ip, src, n);
   }
-  
-  for(tot=0; tot<n; tot+=m, off+=m, src+=m){
-	cs_addr = bcsmap(ip, bn, n - tot);
-	addr = cs_addr >> 8;
-	length = cs_addr & 255;
+
+  if(off > ip->size || off + n < off)
+    return -1;
+
+  // [20172644] write cs
+  if(ip->type == T_CS){
+	while(ip->addrs[bn]){
+	  accum += ip->addrs[bn] & 255;
+	  if(accum >= off/BSIZE){
+		accum -= ip->addrs[bn] & 255;
+		break;
+	  }
+	  if(++bn >= NDIRECT)
+		return -1;
+	}
 	
-    bp = bread(ip->dev, addr);
-    m = min(n - tot, (accum + length) * BSIZE - off);
-    memmove(bp->data + (off - accum*BSIZE), src, m);
-    log_write(bp);
-    brelse(bp);
-	accum += length;
+	for(tot=0; tot<n; tot+=m, off+=m, src+=m){
+	  cs_addr = bcsmap(ip, bn, n - tot);
+	  addr = cs_addr >> 8;
+	  length = cs_addr & 255;
+	  
+	  bp = bread(ip->dev, addr);
+	  m = min(n - tot, (accum + length) * BSIZE - off);
+	  memmove(bp->data + (off - accum*BSIZE), src, m);
+	  log_write(bp);
+	  brelse(bp);
+	  accum += length;
+	}
+  }
+  else {
+	if(off + n > MAXFILE*BSIZE)
+	  return -1;
+
+	for(tot=0; tot<n; tot+=m, off+=m, src+=m){
+	  bp = bread(ip->dev, bmap(ip, off/BSIZE));
+	  m = min(n - tot, BSIZE - off%BSIZE);
+	  memmove(bp->data + off%BSIZE, src, m);
+	  log_write(bp);
+	  brelse(bp);
+	}
   }
 
   if(n > 0 && off > ip->size){
-    ip->size = off;
-    iupdate(ip);
+	ip->size = off;
+	iupdate(ip);
   }
   return n;
 }
