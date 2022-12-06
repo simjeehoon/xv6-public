@@ -572,7 +572,7 @@ itrunc(struct inode *ip)
 		addr = ip->addrs[i] >> 8;
 		length = ip->addrs[i] & 255;
 		for(j = 0 ; j < length ; j++)
-		  bfree(ip->dev, addr+BSIZE*j);
+		  bfree(ip->dev, addr+j);
 		ip->addrs[i] = 0;
 	  }
 	}
