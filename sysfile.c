@@ -449,3 +449,39 @@ sys_pipe(void)
   fd[1] = fd1;
   return 0;
 }
+
+//[20172644] printinfo
+int
+sys_printinfo(void)
+{
+  struct file *f;
+  char *fname;
+  if(argfd(0, 0, &f) < 0 || argstr(1, &fname) < 0)
+    return -1;
+  
+  int num, length;
+  struct inode *ip = f->ip;
+  const char *typestr[] = {"X", "DIR", "FILE", "DEV", "CS"};
+  cprintf("FILE NAME: %s\n", fname);
+  cprintf("INODE NUM: %d\n", ip->inum);
+  cprintf("FILE TYPE: %s\n", typestr[ip->type]);
+  cprintf("FILE SIZE: %d Bytes\n", ip->size);
+  cprintf("DIRECT BLOCK INFO:\n");
+  if(ip->type == T_FILE){
+	for(int i = 0 ; i < NDIRECT ; i++){
+	  if(ip->addrs[i])
+		cprintf("[%d] %d\n",i,ip->addrs[i]);
+	}
+  }
+  else if(ip->type == T_CS){
+	for(int i = 0 ; i < NDIRECT ; i++){
+	  if(!ip->addrs[i])
+		continue;
+	  num = ip->addrs[i] >> 8;
+	  length = ip->addrs[i] & 255;
+	  cprintf("[%d] %d (num: %d, length: %d)\n",
+		i, ip->addrs[i], num, length);
+	}
+  }
+  return 0;
+}

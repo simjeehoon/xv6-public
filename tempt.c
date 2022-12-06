@@ -79,104 +79,6 @@ balloc(uint dev)
 
 // Allocate a zeroed disk block.
 static uint
-b5alloc(uint dev, int prevbnum, uint needlen, uint *alloclen)
-{
-  int b, bi, m;
-  struct buf *bp;
-  bp = 0;
-  if(prevbnum == -1){
-	b=0;
-	bi=0;
-  }
-  else{
-	int nextbnum = prevbnum+1;
-	b = nextbnum / BPB;
-	bi = nextbnum % BPB;
-  }
-  int staddr = -1;
-  int length = 0;
-  int modified;
-  while(b < sb.size){
-    bp = bread(dev, BBLOCK(b, sb));
-	modified = 0;
-	while(bi < BPB && b+bi < sb.size){
-      m = 1 << (bi % 8);
-	  if(prevbnum == -1) { //no need to sequence
-		if((bp->data[bi/8] & m) == 0) {  // Is block free?
-		  if(staddr == -1)
-			staddr = b+bi;
-		  bp->data[bi/8] |= m;  // Mark block in use.
-		  modified = 1;
-		  length++;
-		  if(needlen <= length){
-			log_write(bp);
-			brelse(bp);
-			for(int i = staddr; i < b + bi; i++)
-			  bzero(dev, i);
-			*alloclen = length;
-			return staddr;
-		  }
-		}
-		else if(staddr != -1){ // end sequence
-		  log_write(bp);
-		  brelse(bp);
-		  for(int i = staddr; i < b + bi; i++)
-			bzero(dev, i);
-		  *alloclen = length;
-		  return staddr;
-		}
-	  }
-	  else { //need to sequence
-		if((bp->data[bi/8] & m) == 0) {  // Is block free?
-		  if(staddr == -1)
-			staddr = b+bi;
-		  bp->data[bi/8] |= m;  // Mark block in use.
-		  modified = 1;
-		  length++;
-		  if(needlen <= length){
-			log_write(bp);
-			brelse(bp);
-			for(int i = staddr; i < b + bi; i++)
-			  bzero(dev, i);
-			*alloclen = length;
-			return staddr;
-		  }
-		}
-		else{ //not free
-		  if(staddr == -1){ //not sequence
-			brelse(bp);
-			return -1;
-		  }
-		  else{  //sequence
-			log_write(bp);
-			brelse(bp);
-			for(int i = staddr; i < b + bi; i++) 
-			  bzero(dev, i);
-			*alloclen = length;
-			return staddr;
-		  }
-		}
-	  }
-	  ++bi;
-	}
-	if(modified){
-	  log_write(bp);
-	  brelse(bp);
-	  for(int i = staddr; i < b + bi; i++)
-		bzero(dev, i);
-	}
-	else{
-	  brelse(bp);
-	}
-	b += BPB;
-	bi=0;
-  }
-  panic("balloc: out of blocks");
-}
-
-/*
-// Allocate a zeroed disk block.
-static uint
 b3alloc(uint dev, uint prevaddr)
 {
   int b, bi, m;
@@ -205,77 +107,7 @@ b3alloc(uint dev, uint prevaddr)
   }
   panic("balloc: out of blocks");
 }
-*/
 
-/*
-// Allocate zeroed disk blocks.
-static uint
-b4alloc(uint dev, uint prevaddr, uint needlen, uint *seqlen)
-{
-  int b, bi, m;
-  struct buf *bp;
-
-  int staddr = -1;
-  int si;
-  int modified;
-
-  bp = 0;
-  for(b = 0; b < sb.size; b += BPB){
-    bp = bread(dev, BBLOCK(b, sb));
-	modified = 0;
-    for(bi = 0; bi < BPB && b + bi < sb.size; bi++){
-      m = 1 << (bi % 8);
-      if((bp->data[bi/8] & m) == 0){  // Is block free?
-		if(prevaddr == -1 || prevaddr + 1 == b+bi){ // Is block is sequential?
-		  if(staddr == -1)
-			staddr = b+bi;
-		  prevaddr = b+bi;
-
-		  bp->data[bi/8] |= m;  // Mark block in use.
-		  modified = 1;
-		  if(needlen <= prevaddr - staddr + 1){ // got needlen
-			log_write(bp);
-			brelse(bp);
-			for(si = staddr; si<=prevaddr; si++)
-			  bzero(dev, si);
-			*seqlen = prevaddr - staddr + 1;
-			return staddr;
-		  }
-		}
-      }
-	  else{ // not free
-		if(prevaddr == -1) // we need one
-		  continue;
-		else if(b+bi > prevaddr){
-		  if(staddr == -1){ // not sequntial block
-			brelse(bp);
-			*seqlen = -1;
-			return -1;
-		  }
-		  else{ // sequence's end
-			log_write(bp);
-			brelse(bp);
-			for(si = staddr; si<=prevaddr; si++)
-			  bzero(dev, si);
-			*seqlen = prevaddr - staddr + 1;
-			return staddr;
-		  }
-
-		}
-	  }
-    }
-	if(modified){
-	  log_write(bp);
-	  brelse(bp);
-	  for(si = staddr; si<=prevaddr; si++)
-		bzero(dev, si);
-	}
-	else
-	  brelse(bp);
-  }
-  panic("balloc: out of blocks");
-}
-*/
 /*
 // [20172644] Allocate zeroed disk blocks.
 static uint
@@ -702,7 +534,7 @@ bmap(struct inode *ip, uint bn)
 
 // [20172644] bcsmap
 static uint
-bcsmap(struct inode *ip, uint off, uint n)
+bcsmap(struct inode *ip, uint off)
 {
   uint staddr;
   uint prevaddr;
@@ -711,11 +543,9 @@ bcsmap(struct inode *ip, uint off, uint n)
   uint bn;
   uint position = off/BSIZE;
   uint accum;
-  uint seqlen;
-  uint needlen = n % BSIZE ? n / BSIZE + 1 : n / BSIZE;
 
   for(bn = 0, accum = 0 ; bn < NDIRECT && ip->addrs[bn] ; bn++){
-	accum += ip->addrs[bn] & 255; // add length to accum
+	accum += ip->addrs[bn] & 255; // add length
 	if(accum > position){ // found data.
 	  accum -= ip->addrs[bn] & 255;
 	  return (ip->addrs[bn] >> 8) + (position - accum); // return that block.
@@ -726,23 +556,20 @@ bcsmap(struct inode *ip, uint off, uint n)
 	accum -= ip->addrs[bn-1] & 255; 
 	staddr = ip->addrs[bn-1] >> 8;
 	alloclen = ip->addrs[bn-1] & 255;
-	if(alloclen < 255){
-	  prevaddr = staddr+alloclen - 1;
-	  int b;
-	  if(255-alloclen < needlen)
-		b = b5alloc(ip->dev, prevaddr, 255-alloclen, &seqlen);
-	  else
-		b = b5alloc(ip->dev, prevaddr, needlen, &seqlen);
-	  if(b != -1){ // 확장 성공
-		alloclen += seqlen;
-		ip->addrs[bn-1] = (staddr << 8) | (alloclen & 255);
-		if(accum + alloclen > position){ // 데이터를 위치시킬 공간을 얻었다면
-		  cprintf("realloc! %d, %d\n", staddr, alloclen);
-		  return staddr + (position - accum);
-		}
-	  }
+	prevaddr = staddr+alloclen - 1;
+	while(alloclen < 255 && accum + alloclen <= position){  // 연장 할당
+	  prevaddr = b3alloc(ip->dev, prevaddr);
+	  if(prevaddr == -1)
+		break;
+	  ++alloclen;
 	}
-	accum += alloclen;
+	if((ip->addrs[bn-1] & 255) != alloclen){ // 확장하였으면 아이노드에 저장
+	  ip->addrs[bn-1] = (staddr << 8) | (alloclen & 255);
+	}
+	if(accum + alloclen > position){ // 데이터를 위치시킬 공간을 얻었다면
+	  cprintf("realloc! %d, %d\n", staddr, alloclen);
+	  return staddr + alloclen - 1;
+	}
   }
 
   if(bn >= NDIRECT){
@@ -750,15 +577,26 @@ bcsmap(struct inode *ip, uint off, uint n)
 	return -1;
   }
 
-  if(needlen <= 255)
-	staddr = b5alloc(ip->dev, -1, needlen, &seqlen); // 새로 할당
-  else
-	staddr = b5alloc(ip->dev, -1, 255, &seqlen); // 새로 할당
-  alloclen = seqlen;
-  ip->addrs[bn] = (staddr << 8) | (alloclen & 255);
+  while(1){
+	staddr = prevaddr = b3alloc(ip->dev, -1); // 새로 할당
+	alloclen = 1;
+	while(alloclen < 255 && accum + alloclen <= position){ // 연장 할당
+	  prevaddr = b3alloc(ip->dev, prevaddr);
+	  if(prevaddr == -1)
+		  break;
+	  ++alloclen;
+	}
+	ip->addrs[bn] = (staddr << 8) | (alloclen & 255);
+	if(accum + alloclen > position)
+	  break;
+	else if(++bn >= NDIRECT){
+	  panic("bcsmap: Exceeded the maximum file size.");
+	  return -1;
+	}
+	accum += alloclen;
+  }
   cprintf("alloc [%d] %d, %d\n", bn, staddr, alloclen);
-  cprintf("/test: %d %d\n", position, accum);
-  return staddr + (position - accum);
+  return staddr + alloclen - 1;
 }
 
 // Truncate inode (discard contents).
@@ -846,7 +684,7 @@ readi(struct inode *ip, char *dst, uint off, uint n)
   // [20172644] readi for cs
   if(ip->type == T_CS){
 	for(tot=0; tot<n; tot+=m, off+=m, dst+=m){
-	  bp = bread(ip->dev, bcsmap(ip, off, n));
+	  bp = bread(ip->dev, bcsmap(ip, off));
 	  m = min(n - tot, BSIZE - off%BSIZE);
 	  memmove(dst, bp->data + off%BSIZE, m);
 	  brelse(bp);
@@ -883,12 +721,11 @@ writei(struct inode *ip, char *src, uint off, uint n)
   if(off > ip->size || off + n < off)
     return -1;
 
+  cprintf("n:%d\n", n);
   // [20172644] write cs
   if(ip->type == T_CS){
 	for(tot=0; tot<n; tot+=m, off+=m, src+=m){
-	  int test = bcsmap(ip, off, n-tot);
-	  cprintf("mapping:%d\n", test);
-	  bp = bread(ip->dev, test);
+	  bp = bread(ip->dev, bcsmap(ip, off));
 	  m = min(n - tot, BSIZE - off%BSIZE);
 	  memmove(bp->data + off%BSIZE, src, m);
 	  log_write(bp);
