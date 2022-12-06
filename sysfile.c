@@ -483,5 +483,6 @@ sys_printinfo(void)
 		i, ip->addrs[i], num, length);
 	}
   }
+  cprintf("\n");
   return 0;
 }

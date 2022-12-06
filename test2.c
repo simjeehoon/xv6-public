@@ -35,8 +35,10 @@ int main()
 			exit();
 		}
 
+		/*	
 		if (i == 50)
 			write_to_norm("test_norm");	
+		*/
 	}
 
 	printinfo(fd, fname);
