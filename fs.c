@@ -498,7 +498,7 @@ bmap(struct inode *ip, uint bn)
 
 // [20172644] CS를 위한 블록 매핑 함수
 static uint
-bcsmap(struct inode *ip, uint off, uint n)
+bcsmap(struct inode *ip, uint off, uint n, int *out_full)
 {
   uint staddr;
   uint prevaddr;
@@ -509,6 +509,8 @@ bcsmap(struct inode *ip, uint off, uint n)
   uint accum;
   uint seqlen;
   uint needlen = n % BSIZE ? n / BSIZE + 1 : n / BSIZE;
+  if(out_full)
+	*out_full = 0;
 
   for(bn = 0, accum = 0 ; bn < NDIRECT && ip->addrs[bn] ; bn++){
 	accum += ip->addrs[bn] & 255; // [20172644] accum 변수에 길이를 더함
@@ -541,7 +543,8 @@ bcsmap(struct inode *ip, uint off, uint n)
   }
 
   if(bn >= NDIRECT){ // [20172644] 용량초과
-	panic("bcsmap: Exceeded the maximum file size.");
+	if(out_full)
+	  *out_full = 1;
 	return -1;
   }
 
@@ -639,7 +642,7 @@ readi(struct inode *ip, char *dst, uint off, uint n)
   // [20172644] readi for cs
   if(ip->type == T_CS){
 	for(tot=0; tot<n; tot+=m, off+=m, dst+=m){
-	  bp = bread(ip->dev, bcsmap(ip, off, n-tot));
+	  bp = bread(ip->dev, bcsmap(ip, off, n-tot, 0));
 	  m = min(n - tot, BSIZE - off%BSIZE);
 	  memmove(dst, bp->data + off%BSIZE, m);
 	  brelse(bp);
@@ -666,6 +669,8 @@ writei(struct inode *ip, char *src, uint off, uint n)
 
   uint tot, m;
   struct buf *bp;
+  int full = 0;
+  uint bnum;
 
   if(ip->type == T_DEV){
     if(ip->major < 0 || ip->major >= NDEV || !devsw[ip->major].write)
@@ -679,7 +684,14 @@ writei(struct inode *ip, char *src, uint off, uint n)
   // [20172644] writei for cs
   if(ip->type == T_CS){
 	for(tot=0; tot<n; tot+=m, off+=m, src+=m){
-	  bp = bread(ip->dev, bcsmap(ip, off, n-tot));
+	  bnum = bcsmap(ip, off, n-tot, &full);
+	  if(full){
+		if(tot == 0)
+		  return -1;
+		else
+		  return tot;
+	  }
+	  bp = bread(ip->dev, bnum);
 	  m = min(n - tot, BSIZE - off%BSIZE);
 	  memmove(bp->data + off%BSIZE, src, m);
 	  log_write(bp);
