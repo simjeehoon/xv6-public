@@ -171,7 +171,14 @@ bcsalloc(uint dev, int prevbnum, uint needlen, uint *alloclen)
 	b += BPB;
 	bi=0;
   }
-  panic("balloc: out of blocks");
+  if(staddr == -1){ // [20172644] 디스크가 꽉참
+	panic("CS : no more free block");
+	return -1;
+  }
+  else{  // [20172644] 디스크가 꽉 찼고, 할당한 것 반환
+	*alloclen = length;
+	return staddr;
+  }
 }
 
 // Free a disk block.
@@ -498,7 +505,7 @@ bmap(struct inode *ip, uint bn)
 
 // [20172644] CS를 위한 블록 매핑 함수
 static uint
-bcsmap(struct inode *ip, uint off, uint n, int *out_full)
+bcsmap(struct inode *ip, uint off, uint n)
 {
   uint staddr;
   uint prevaddr;
@@ -509,8 +516,6 @@ bcsmap(struct inode *ip, uint off, uint n, int *out_full)
   uint accum;
   uint seqlen;
   uint needlen = n % BSIZE ? n / BSIZE + 1 : n / BSIZE;
-  if(out_full)
-	*out_full = 0;
 
   for(bn = 0, accum = 0 ; bn < NDIRECT && ip->addrs[bn] ; bn++){
 	accum += ip->addrs[bn] & 255; // [20172644] accum 변수에 길이를 더함
@@ -542,9 +547,8 @@ bcsmap(struct inode *ip, uint off, uint n, int *out_full)
 	accum += alloclen;
   }
 
-  if(bn >= NDIRECT){ // [20172644] 용량초과
-	if(out_full)
-	  *out_full = 1;
+  if(bn >= NDIRECT){ // [20172644] 블록을 더이상 할당 불가능
+	panic("CS : no more block in inode.");
 	return -1;
   }
 
@@ -642,7 +646,7 @@ readi(struct inode *ip, char *dst, uint off, uint n)
   // [20172644] readi for cs
   if(ip->type == T_CS){
 	for(tot=0; tot<n; tot+=m, off+=m, dst+=m){
-	  bp = bread(ip->dev, bcsmap(ip, off, n-tot, 0));
+	  bp = bread(ip->dev, bcsmap(ip, off, n-tot));
 	  m = min(n - tot, BSIZE - off%BSIZE);
 	  memmove(dst, bp->data + off%BSIZE, m);
 	  brelse(bp);
@@ -666,11 +670,8 @@ readi(struct inode *ip, char *dst, uint off, uint n)
 int
 writei(struct inode *ip, char *src, uint off, uint n)
 {
-
   uint tot, m;
   struct buf *bp;
-  int full = 0;
-  uint bnum;
 
   if(ip->type == T_DEV){
     if(ip->major < 0 || ip->major >= NDEV || !devsw[ip->major].write)
@@ -684,14 +685,7 @@ writei(struct inode *ip, char *src, uint off, uint n)
   // [20172644] writei for cs
   if(ip->type == T_CS){
 	for(tot=0; tot<n; tot+=m, off+=m, src+=m){
-	  bnum = bcsmap(ip, off, n-tot, &full);
-	  if(full){
-		if(tot == 0)
-		  return -1;
-		else
-		  return tot;
-	  }
-	  bp = bread(ip->dev, bnum);
+	  bp = bread(ip->dev, bcsmap(ip, off, n-tot));
 	  m = min(n - tot, BSIZE - off%BSIZE);
 	  memmove(bp->data + off%BSIZE, src, m);
 	  log_write(bp);
