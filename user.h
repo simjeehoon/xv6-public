@@ -23,7 +23,7 @@ int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
-int weightset(int weight); // [20172644] weight set sys call
+int weightset(int weight); // [os-prj3] weight set sys call
 
 // ulib.c
 int stat(const char*, struct stat*);

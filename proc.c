@@ -10,13 +10,13 @@
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
-  unsigned long minpriority;			// [20172644] min priority for new process
+  unsigned long minpriority;			// [os-prj3] min priority for new process
 } ptable;
 
 static struct proc *initproc;
 
 int nextpid = 1;
-unsigned long nextweight = 1;  // [20172644] weight value for new process
+unsigned long nextweight = 1;  // [os-prj3] weight value for new process
 extern void forkret(void);
 extern void trapret(void);
 
@@ -90,8 +90,8 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
-  p->weight = nextweight++; // [20172644] Set weight
-  p->priority = ptable.minpriority; // [20172644] Set min priority
+  p->weight = nextweight++; // [os-prj3] Set weight
+  p->priority = ptable.minpriority; // [os-prj3] Set min priority
 
   release(&ptable.lock);
 
@@ -128,7 +128,7 @@ userinit(void)
   extern char _binary_initcode_start[], _binary_initcode_size[];
 
   acquire(&ptable.lock); 
-  ptable.minpriority = 3; // [20172644] Set minpriority
+  ptable.minpriority = 3; // [os-prj3] Set minpriority
   release(&ptable.lock);
 
   p = allocproc();
@@ -334,22 +334,22 @@ scheduler(void)
   struct cpu *c = mycpu();
   c->proc = 0;
 
-  struct proc *selected; // [20172644] proc variable for SSU Scheduler
-  unsigned long minpriority;  // [20172644] min priority variable for SSU Scheduler
-  int updated; // [20172644] If ptable.minpriority is updated, this will be set 1.
+  struct proc *selected; // [os-prj3] proc variable for SSU Scheduler
+  unsigned long minpriority;  // [os-prj3] min priority variable for SSU Scheduler
+  int updated; // [os-prj3] If ptable.minpriority is updated, this will be set 1.
   
   for(;;){
-	selected = (void*)0; // [20172644] Set NULL to selected process pointer.
-	updated = 0;  // [20172644] Set update to 0.
+	selected = (void*)0; // [os-prj3] Set NULL to selected process pointer.
+	updated = 0;  // [os-prj3] Set update to 0.
 
     // Enable interrupts on this processor.
     sti();
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state == RUNNABLE){ // [20172644] Only select RUNNABLE process.
+      if(p->state == RUNNABLE){ // [os-prj3] Only select RUNNABLE process.
 		/** 
-		   [20172644] Select process which has min priority.
+		   [os-prj3] Select process which has min priority.
 		 */
 		if(selected == (void*)0 || minpriority > p->priority){
 		  minpriority = p->priority;
@@ -357,10 +357,10 @@ scheduler(void)
 		}
 	  }
 	}
-	if(selected != (void*)0){ // [20172644] If process is selected
+	if(selected != (void*)0){ // [os-prj3] If process is selected
 
 		/**
-		  [20172644] If it's debug mode, print process id, name, weight, priority.
+		  [os-prj3] If it's debug mode, print process id, name, weight, priority.
 		  */
 #ifdef DEBUG
 		cprintf("PID: %d, NAME: %s, WEIGHT: %d, PRIORITY: ",
@@ -372,32 +372,32 @@ scheduler(void)
       // Switch to chosen process.  It is the process's job
       // to release ptable.lock and then reacquire it
       // before jumping back to us.
-      c->proc = selected; // [20172644] Set selected process.
-      switchuvm(selected); // [20172644] Switch to selected process.
-      selected->state = RUNNING; // [20172644] Set state to RUNNING.
+      c->proc = selected; // [os-prj3] Set selected process.
+      switchuvm(selected); // [os-prj3] Switch to selected process.
+      selected->state = RUNNING; // [os-prj3] Set state to RUNNING.
 
-      swtch(&(c->scheduler), selected->context); // [20172644] context switching.
+      swtch(&(c->scheduler), selected->context); // [os-prj3] context switching.
       switchkvm();
 
       // Process is done running for now.
       // It should have changed its p->state before coming back.
 
-	  // [20172644] Calculate new priority.
+	  // [os-prj3] Calculate new priority.
 #define TIME_SLICE 10000000L
 	  selected->priority = selected->priority + (TIME_SLICE / selected->weight);
 
 	  /** 
-		 [20172644] Search min priority.
+		 [os-prj3] Search min priority.
 		 */
 	  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
 		if(p->state == RUNNABLE){ 
 		  if(!updated || minpriority > p->priority){
-			updated = 1; // [20172644] Set update to 1.
+			updated = 1; // [os-prj3] Set update to 1.
 			minpriority = p->priority;
 		  }
 		}
 	  }
-	  if(updated){ // [20172644] Renew ptable.minpriority.
+	  if(updated){ // [os-prj3] Renew ptable.minpriority.
 		ptable.minpriority = minpriority;
 	  }
 
@@ -514,7 +514,7 @@ wakeup1(void *chan)
 
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
     if(p->state == SLEEPING && p->chan == chan){
-	  p->priority = ptable.minpriority;	// [20172644] Set priority to min priority.
+	  p->priority = ptable.minpriority;	// [os-prj3] Set priority to min priority.
       p->state = RUNNABLE;
 	}
 }
@@ -589,7 +589,7 @@ procdump(void)
 }
 
 /**
- [20172644]
+ [os-prj3]
   This is called by system call weightset.
   Set weight in caller's proc struct to w
   */

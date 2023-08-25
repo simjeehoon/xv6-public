@@ -91,7 +91,7 @@ sys_uptime(void)
 }
 
 /**
-  [20172644] It is used for sdebug.
+  [os-prj3] It is used for sdebug.
   Set proc's weight to user's argument.
    */
 int

@@ -22,7 +22,7 @@ void            cprintf(char*, ...);
 void            consoleintr(int(*)(void));
 void            panic(char*) __attribute__((noreturn));
 
-void			printul(unsigned long); // [20172644] for debug option
+void			printul(unsigned long); // [os-prj3] for debug option
 
 // exec.c
 int             exec(char*, char**);
@@ -122,7 +122,7 @@ void            userinit(void);
 int             wait(void);
 void            wakeup(void*);
 void            yield(void);
-void			do_weightset(unsigned long w); // [20172644] for weightset system call
+void			do_weightset(unsigned long w); // [os-prj3] for weightset system call
 
 // swtch.S
 void            swtch(struct context**, struct context*);

@@ -25,7 +25,7 @@ static struct {
 } cons;
 
 /*
-   [20172644] function to print unsigned long integer in cernel
+   [os-prj3] function to print unsigned long integer in cernel
    */
 void
 printul(unsigned long x)
