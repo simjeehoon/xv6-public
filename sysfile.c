@@ -254,7 +254,7 @@ create(char *path, short type, short major, short minor)
     if(type == T_FILE && ip->type == T_FILE)
       return ip;
 	else if(type == T_CS && ip->type == T_CS)
-	  // [20172644] CS 처리
+	  // [os-prj5] CS 처리
       return ip;
     iunlockput(ip);
     return 0;
@@ -299,7 +299,7 @@ sys_open(void)
   begin_op();
 
   if(omode & O_CREATE){
-    // [20172644] CS 처리
+    // [os-prj5] CS 처리
 	if(omode & O_CS)
 	  ip = create(path, T_CS, 0, 0);
 	else
@@ -450,7 +450,7 @@ sys_pipe(void)
   return 0;
 }
 
-//[20172644] printinfo
+//[os-prj5] printinfo
 int
 sys_printinfo(void)
 {

@@ -77,18 +77,18 @@ balloc(uint dev)
   panic("balloc: out of blocks");
 }
 
-// [20172644] CS를 위한 block 할당 함수
+// [os-prj5] CS를 위한 block 할당 함수
 static uint
 bcsalloc(uint dev, int prevbnum, uint needlen, uint *alloclen)
 {
   int b, bi, m;
   struct buf *bp;
   bp = 0;
-  if(prevbnum == -1){ // [20172644] 완전히 새로운 영역을 할당하려고 할때
+  if(prevbnum == -1){ // [os-prj5] 완전히 새로운 영역을 할당하려고 할때
 	b=0;
 	bi=0;
   }
-  else{ // [20172644] 이전 영역에 이어서 할당하려고 할 때
+  else{ // [os-prj5] 이전 영역에 이어서 할당하려고 할 때
 	int nextbnum = prevbnum+1;
 	b = nextbnum / BPB;
 	bi = nextbnum % BPB;
@@ -101,11 +101,11 @@ bcsalloc(uint dev, int prevbnum, uint needlen, uint *alloclen)
 	modified = 0;
 	while(bi < BPB && b+bi < sb.size){
       m = 1 << (bi % 8);
-	  if(prevbnum == -1) {  // [20172644] 완전히 새로운 영역을 할당하는 경우
-		if((bp->data[bi/8] & m) == 0) {  // [20172644] Is block free?
+	  if(prevbnum == -1) {  // [os-prj5] 완전히 새로운 영역을 할당하는 경우
+		if((bp->data[bi/8] & m) == 0) {  // [os-prj5] Is block free?
 		  if(staddr == -1)
 			staddr = b+bi;
-		  bp->data[bi/8] |= m;  // [20172644]  Mark block in use.
+		  bp->data[bi/8] |= m;  // [os-prj5]  Mark block in use.
 		  modified = 1;
 		  length++;
 		  if(needlen <= length){
@@ -117,7 +117,7 @@ bcsalloc(uint dev, int prevbnum, uint needlen, uint *alloclen)
 			return staddr;
 		  }
 		}
-		else if(staddr != -1){ // [20172644] end sequence
+		else if(staddr != -1){ // [os-prj5] end sequence
 		  log_write(bp);
 		  brelse(bp);
 		  for(int i = staddr; i < b + bi; i++)
@@ -126,11 +126,11 @@ bcsalloc(uint dev, int prevbnum, uint needlen, uint *alloclen)
 		  return staddr;
 		}
 	  }
-	  else { // [20172644] 이전 공간에 이어서 할당하는 경우
-		if((bp->data[bi/8] & m) == 0) {  //  [20172644] Is block free?
+	  else { // [os-prj5] 이전 공간에 이어서 할당하는 경우
+		if((bp->data[bi/8] & m) == 0) {  //  [os-prj5] Is block free?
 		  if(staddr == -1)
 			staddr = b+bi;
-		  bp->data[bi/8] |= m;  // [20172644]  Mark block in use.
+		  bp->data[bi/8] |= m;  // [os-prj5]  Mark block in use.
 		  modified = 1;
 		  length++;
 		  if(needlen <= length){
@@ -142,12 +142,12 @@ bcsalloc(uint dev, int prevbnum, uint needlen, uint *alloclen)
 			return staddr;
 		  }
 		}
-		else{ // [20172644] not free
-		  if(staddr == -1){ // [20172644] not sequence
+		else{ // [os-prj5] not free
+		  if(staddr == -1){ // [os-prj5] not sequence
 			brelse(bp);
 			return -1;
 		  }
-		  else{  // [20172644] sequence
+		  else{  // [os-prj5] sequence
 			log_write(bp);
 			brelse(bp);
 			for(int i = staddr; i < b + bi; i++) 
@@ -159,7 +159,7 @@ bcsalloc(uint dev, int prevbnum, uint needlen, uint *alloclen)
 	  }
 	  ++bi;
 	}
-	if(modified){ //[20172644] 변경 사항 적용
+	if(modified){ //[os-prj5] 변경 사항 적용
 	  log_write(bp);
 	  brelse(bp);
 	  for(int i = staddr; i < b + bi; i++)
@@ -171,11 +171,11 @@ bcsalloc(uint dev, int prevbnum, uint needlen, uint *alloclen)
 	b += BPB;
 	bi=0;
   }
-  if(staddr == -1){ // [20172644] 디스크가 꽉참
+  if(staddr == -1){ // [os-prj5] 디스크가 꽉참
 	panic("CS : no more free block");
 	return -1;
   }
-  else{  // [20172644] 디스크가 꽉 찼고, 할당한 것 반환
+  else{  // [os-prj5] 디스크가 꽉 찼고, 할당한 것 반환
 	*alloclen = length;
 	return staddr;
   }
@@ -503,7 +503,7 @@ bmap(struct inode *ip, uint bn)
   panic("bmap: out of range");
 }
 
-// [20172644] CS를 위한 블록 매핑 함수
+// [os-prj5] CS를 위한 블록 매핑 함수
 static uint
 bcsmap(struct inode *ip, uint off, uint n)
 {
@@ -518,28 +518,28 @@ bcsmap(struct inode *ip, uint off, uint n)
   uint needlen = n % BSIZE ? n / BSIZE + 1 : n / BSIZE;
 
   for(bn = 0, accum = 0 ; bn < NDIRECT && ip->addrs[bn] ; bn++){
-	accum += ip->addrs[bn] & 255; // [20172644] accum 변수에 길이를 더함
-	if(accum > position){ // [20172644] 위치 발견
+	accum += ip->addrs[bn] & 255; // [os-prj5] accum 변수에 길이를 더함
+	if(accum > position){ // [os-prj5] 위치 발견
 	  accum -= ip->addrs[bn] & 255;
-	  return (ip->addrs[bn] >> 8) + (position - accum); // [20172644] 블럭의 위치를 리턴
+	  return (ip->addrs[bn] >> 8) + (position - accum); // [os-prj5] 블럭의 위치를 리턴
 	}
   }
 
-  if(bn != 0){ // [20172644] 마지막 addrs 확장
+  if(bn != 0){ // [os-prj5] 마지막 addrs 확장
 	accum -= ip->addrs[bn-1] & 255; 
 	staddr = ip->addrs[bn-1] >> 8;
 	alloclen = ip->addrs[bn-1] & 255;
-	if(alloclen < 255){ // [20172644] 255 미만일때만 확장 가능
+	if(alloclen < 255){ // [os-prj5] 255 미만일때만 확장 가능
 	  prevaddr = staddr+alloclen - 1;
 	  int b;
 	  if(255-alloclen < needlen)
 		b = bcsalloc(ip->dev, prevaddr, 255-alloclen, &seqlen);
 	  else
 		b = bcsalloc(ip->dev, prevaddr, needlen, &seqlen);
-	  if(b != -1){ // [20172644] 확장 성공
+	  if(b != -1){ // [os-prj5] 확장 성공
 		alloclen += seqlen;
 		ip->addrs[bn-1] = (staddr << 8) | (alloclen & 255);
-		if(accum + alloclen > position){ // [20172644] 데이터를 위치시킬 공간을 얻었다면
+		if(accum + alloclen > position){ // [os-prj5] 데이터를 위치시킬 공간을 얻었다면
 		  return staddr + (position - accum);
 		}
 	  }
@@ -547,12 +547,12 @@ bcsmap(struct inode *ip, uint off, uint n)
 	accum += alloclen;
   }
 
-  if(bn >= NDIRECT){ // [20172644] 블록을 더이상 할당 불가능
+  if(bn >= NDIRECT){ // [os-prj5] 블록을 더이상 할당 불가능
 	panic("CS : no more block in inode.");
 	return -1;
   }
 
-  if(needlen <= 255) // [20172644] 최대 연속 할당 길이는 255
+  if(needlen <= 255) // [os-prj5] 최대 연속 할당 길이는 255
 	staddr = bcsalloc(ip->dev, -1, needlen, &seqlen); 
   else
 	staddr = bcsalloc(ip->dev, -1, 255, &seqlen); 
@@ -573,7 +573,7 @@ itrunc(struct inode *ip)
   struct buf *bp;
   uint addr, length;
   uint *a;
-  if(ip->type == T_CS){ // [20172644] CS 시스템 전용 삭제 처리
+  if(ip->type == T_CS){ // [os-prj5] CS 시스템 전용 삭제 처리
 	for(i = 0; i < NDIRECT; i++){
 	  if(ip->addrs[i]){
 		addr = ip->addrs[i] >> 8;
@@ -643,7 +643,7 @@ readi(struct inode *ip, char *dst, uint off, uint n)
   if(off + n > ip->size)
     n = ip->size - off;
 
-  // [20172644] readi for cs
+  // [os-prj5] readi for cs
   if(ip->type == T_CS){
 	for(tot=0; tot<n; tot+=m, off+=m, dst+=m){
 	  bp = bread(ip->dev, bcsmap(ip, off, n-tot));
@@ -682,7 +682,7 @@ writei(struct inode *ip, char *src, uint off, uint n)
   if(off > ip->size || off + n < off)
     return -1;
 
-  // [20172644] writei for cs
+  // [os-prj5] writei for cs
   if(ip->type == T_CS){
 	for(tot=0; tot<n; tot+=m, off+=m, src+=m){
 	  bp = bread(ip->dev, bcsmap(ip, off, n-tot));

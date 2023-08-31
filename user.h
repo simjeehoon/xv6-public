@@ -23,7 +23,7 @@ int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
-int printinfo(int, const char*); // [20172644] printinfo
+int printinfo(int, const char*); // [os-prj5] printinfo
 
 // ulib.c
 int stat(const char*, struct stat*);
