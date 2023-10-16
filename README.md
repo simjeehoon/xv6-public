@@ -9,6 +9,8 @@ XV6의 CPU 관리(스케줄링), 메모리 관리(페이징), 파일 시스템�
 
 ### 구성
 
+본 프로젝트는 기능마다 브랜치를 만들었으므로, 기능을 조회하려면 checkout이 필요합니다.
+
 1. [xv6 살펴보기](https://github.com/simjeehoon/xv6-public/tree/os/prj1)
 2. [xv6에 시스템콜 추가하기](https://github.com/simjeehoon/xv6-public/tree/os/prj2)
 3. [xv6에 SSU Scheduler를 추가하여 스케줄링을 더 효율적으로 개선](https://github.com/simjeehoon/xv6-public/tree/os/prj3)
